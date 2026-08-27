@@ -1,2 +1,14 @@
-def main() -> None:
-    print("Hello from merge-gtfs!")
+from .gtfs_class import GTFS
+from .gtfs_schema import GTFS_Schema
+from .gtfs_merge import merge, merge_multiple_gtfs
+from .gtfs_operations import (
+    create_intercity_transfers,
+    merge_duplicated_physical_stops,
+    filter_gtfs,
+    prefix_stop_ids,
+    create_parent_stations,
+    add_missing_parent_station
+    )
+
+__all__ = ["GTFS", "GTFS_Schema", "merge", "merge_multiple_gtfs", "create_intercity_transfers",
+           "merge_duplicated_physical_stops", "filter_gtfs", "prefix_stop_ids", "create_parent_stations", "add_missing_parent_station"]
