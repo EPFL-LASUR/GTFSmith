@@ -1,0 +1,25 @@
+[project]
+name = "merge-gtfs"
+version = "0.1.0"
+description = "Package to merge and effectuate operations on GTFS feeds"
+readme = "README.md"
+authors = [
+    { name = "karlex27", email = "126259759+karlex27@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "geopandas>=1.1.4",
+    "geopy>=2.5.0",
+    "pandas>=3.0.5",
+    "pandera>=0.32.1",
+    "pyarrow>=25.0.1",
+    "rapidfuzz>=3.14.5",
+    "scipy>=1.18.1",
+]
+
+[project.scripts]
+merge-gtfs = "merge_gtfs:main"
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
