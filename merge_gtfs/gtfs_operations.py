@@ -272,7 +272,7 @@ def merge_duplicated_physical_stops(
     return gtfs
 
 
-def filter_gtfs(gtfs: GTFS, route_type: int, output_path: str = None) -> GTFS:
+def filter_gtfs_per_mode(gtfs: GTFS, route_type: int, output_path: str = None) -> GTFS:
     """
     Not all the route_types are needed. This function allows to filter a GTFS feed
     according to the desired route feed. All unnecessary trips, stops, stop_times,
@@ -318,6 +318,110 @@ def filter_gtfs(gtfs: GTFS, route_type: int, output_path: str = None) -> GTFS:
         filtered_frequencies = None
 
     
+    transfers = files.pop("transfers.txt")
+    filtered_transfers = transfers[
+        gtfs_utils.valid_id(transfers["from_stop_id"], filtered_stop_ids)
+        & gtfs_utils.valid_id(transfers["to_stop_id"], filtered_stop_ids)
+        & gtfs_utils.valid_id(transfers["from_trip_id"], filtered_trips_ids)
+        & gtfs_utils.valid_id(transfers["to_trip_id"], filtered_trips_ids)
+        & gtfs_utils.valid_id(transfers["from_route_id"], filtered_routes_ids)
+        & gtfs_utils.valid_id(transfers["to_route_id"], filtered_routes_ids)
+    ]
+    del transfers
+
+
+    calendar = files.pop("calendar.txt", None)
+    if calendar is not None:
+        filtered_calendar = calendar[calendar["service_id"].isin(filtered_service_ids)]
+        del calendar
+    else:
+        filtered_calendar = None
+
+    calendar_dates = files.pop("calendar_dates.txt")
+    filtered_calendar_dates = calendar_dates[calendar_dates["service_id"].isin(filtered_service_ids)]
+    del calendar_dates
+
+    gc.collect()
+
+    filtered_gtfs = GTFS({
+        "agency.txt": files.pop("agency.txt"),
+        "routes.txt": filtered_routes,
+        "stops.txt": filtered_stops,
+        "stop_times.txt": filtered_stop_times,
+        "trips.txt": filtered_trips,
+        "calendar_dates.txt": filtered_calendar_dates,
+        "transfers.txt": filtered_transfers,
+    })
+
+    if filtered_frequencies is not None:
+        filtered_gtfs.files["frequencies.txt"] = filtered_frequencies
+
+    if filtered_calendar is not None:
+        filtered_gtfs.files["calendar.txt"] = filtered_calendar
+
+    if output_path is not None:
+        filtered_gtfs.export_gtfs(output_path)
+
+    return filtered_gtfs
+
+def filter_gtfs_per_bbox(gtfs: GTFS, bbox: tuple[float, float, float, float], output_path: str = None):
+    """
+    Allows to filter all the services present in a GTFS feed in a specific geographical area.
+
+    All the stops in the bounding box are kept. stop_times.txt entries with the stops inside the bounding box are kept,
+    as well as the corresonping trips, routes and services.
+    
+    Args:
+        - gtfs (GTFS): gtfs feed
+        - bbox (tuple[float, float, float, float]): limits of the bounding box (min_lon, min_lat, max_lon, max_lat).
+        - output_path (str): Optional. Path to export the filtered GTFS feed.
+
+    Returns:
+        - filtered_gtfs (GTFS): GTFS feed filtered to a specific bounding box. Export it if output_path is specified.
+
+    """
+
+    files = gtfs.files
+    min_lon, min_lat, max_lon, max_lat = bbox
+
+    stops = files.pop("stops.txt")
+    mask = (
+        stops["stop_lon"].between(min_lon, max_lon)
+        & stops["stop_lat"].between(min_lat, max_lat)
+    )
+    filtered_stops = stops.loc[mask]
+
+    filtered_stop_ids = filtered_stops["stop_id"]
+    if filtered_stop_ids.empty:
+            raise ValueError("The geographical zone does not contain any GTFS stop.")
+
+    del stops
+
+    stop_times = files.pop("stop_times.txt")
+    filtered_stop_times = stop_times[stop_times["stop_id"].isin(filtered_stop_ids)]
+    filtered_trips_ids = filtered_stop_times["trip_id"].unique()
+    del stop_times
+    gc.collect()
+
+    trips = files.pop("trips.txt")
+    filtered_trips = trips[trips["trip_id"].isin(filtered_trips_ids)]
+    filtered_route_ids = filtered_trips["route_id"].unique()
+    filtered_service_ids = filtered_trips["service_id"].unique()
+    del trips
+
+    routes = files.pop("routes.txt")
+    filtered_routes = routes[routes["route_id"].isin(filtered_route_ids)]
+    filtered_routes_ids = filtered_routes["route_id"].unique()
+    del routes
+    gc.collect()
+
+    frequencies = files.pop("frequencies.txt", None)
+    if frequencies is not None:
+        filtered_frequencies = frequencies[frequencies["trip_id"].isin(filtered_trips_ids)]
+        del frequencies
+    else:
+        filtered_frequencies = None
+
     transfers = files.pop("transfers.txt")
     filtered_transfers = transfers[
         gtfs_utils.valid_id(transfers["from_stop_id"], filtered_stop_ids)
