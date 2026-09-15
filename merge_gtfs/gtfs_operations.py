@@ -373,7 +373,7 @@ def filter_gtfs_per_bbox(gtfs: GTFS, bbox: tuple[float, float, float, float], ou
     
     Args:
         - gtfs (GTFS): gtfs feed
-        - bbox (tuple[float, float, float, float]): limits of the bounding box (min_lon, min_lat, max_lon, max_lat).
+        - bbox (tuple[float, float, float, float]): limits of the bounding box (min_lon, min_lat, max_lon, max_lat). CRS is EPSG:4326.
         - output_path (str): Optional. Path to export the filtered GTFS feed.
 
     Returns:

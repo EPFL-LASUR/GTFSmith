@@ -160,11 +160,21 @@ The search radius has been set to 300 m. Again, this is reasonable on the level 
 
 ### 3. Filter GTFS
 
+#### 3.1 Filter per mode
+
 Some feeds (such as the swiss or the netherland's) are aggregated feeds at the national level, and contain therefore long-distance services, but also local and regional bus services. Connections by ship or cable can also be represented.
 
 As delightful it is to obtain this data open-source, it might not be useful for every purpose, and uses a lot of memory. GTFS objects can therefore be filtered according to a specific route type once loaded, reducing their size and drastically improving computation time.
 
 All the references to the routes which are not corresponding to the specified route type are deleted from the GTFS object, reducing its size drastically (especially `stop_times.txt` can become substantially lighter). The memory is also cleaned using the garbage collector `gc.collect()`.
+
+#### 3.2 Filter per geographical area
+
+If only the transport system in a given region/metropolitan area is of interest, it might be useful to clip the GTFS feed to said area, thus reducing the memory usage of the feed. A bounding box in EPSG:4326 is to be given, and all the stops within that bounding box are kept.
+
+The stop times containing stops within that bounding box are then kept, as well as the corresponding trips, routes, services and transfers.
+
+Again, `gc.collect()` is used to clean the memory in the process, allowing to filter big GTFS feed on a computer with less RAM.
 
 ### 4. Prefix stop IDs
 
