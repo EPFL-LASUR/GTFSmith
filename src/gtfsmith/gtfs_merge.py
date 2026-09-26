@@ -161,7 +161,7 @@ def _match_child_stops(
         Mapping of second child stop IDs to first child stop IDs.
     """
 
-    if not mapping_matched_parent:
+    if mapping_matched_parent.empty:
         return {}
 
     first_stops = self.files["stops.txt"]
