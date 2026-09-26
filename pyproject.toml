@@ -1,6 +1,6 @@
 [project]
-name = "merge-gtfs"
-version = "0.1.0"
+name = "gtfsmith"
+version = "0.1.1"
 description = "Package to merge and effectuate operations on GTFS feeds"
 readme = "README.md"
 authors = [
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-merge-gtfs = "merge_gtfs:main"
+merge-gtfs = "gtfsmith:main"
 
 [build-system]
 requires = ["uv_build>=0.12.6,<0.13.0"]
