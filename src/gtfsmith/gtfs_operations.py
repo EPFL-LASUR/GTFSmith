@@ -1,12 +1,13 @@
 import pandas as pd
 import geopandas as gpd
 import gc
+from pathlib import Path
 
 from .gtfs_class import GTFS
 from . import gtfs_utils
 
 def create_intercity_transfers(
-        self: "GTFS",
+        gtfs: "GTFS | str | Path",
         blob_buffer_km: float = 5.0,
         min_stations_per_blob: int = 3,
         max_dist_km: float = 10.0,
@@ -26,6 +27,9 @@ def create_intercity_transfers(
     The transfer time (TT) is approximated by:
         TT = distance / mean_tp_speed + interchange_penalty
     """
+
+    if not isinstance(gtfs, GTFS):
+        gtfs = GTFS.from_zip(gtfs)
     
     transfer_columns = [
         "from_stop_id",
@@ -34,7 +38,7 @@ def create_intercity_transfers(
         "min_transfer_time",
     ]
 
-    stops = self.files.get("stops.txt")
+    stops = gtfs.files.get("stops.txt")
 
     # Get station parents
     stations = stops[stops["location_type"] == 1]
@@ -186,7 +190,7 @@ def create_intercity_transfers(
 
 
 def merge_duplicated_physical_stops(
-    gtfs,
+    gtfs: "GTFS | str | Path",
     radius_m: float = 300.0,
 ):
     """
@@ -207,6 +211,8 @@ def merge_duplicated_physical_stops(
             - child stop_ids are preserved;
             - references to the losing parent are remapped.
     """
+    if not isinstance(gtfs, GTFS):
+        gtfs = GTFS.from_zip(gtfs)
 
     if "stops.txt" not in gtfs.files:
         raise ValueError("GTFS object does not contain stops.txt")
@@ -272,7 +278,7 @@ def merge_duplicated_physical_stops(
     return gtfs
 
 
-def filter_gtfs_per_mode(gtfs: GTFS, route_type: int, output_path: str = None) -> GTFS:
+def filter_gtfs_per_mode(gtfs: "GTFS | str | Path", route_type: int, output_path: str = None) -> GTFS:
     """
     Not all the route_types are needed. This function allows to filter a GTFS feed
     according to the desired route feed. All unnecessary trips, stops, stop_times,
@@ -280,6 +286,8 @@ def filter_gtfs_per_mode(gtfs: GTFS, route_type: int, output_path: str = None) -
     
     This operation can make a big GTFS object (like the swiss GTFS) substantially lighter
     """
+    if not isinstance(gtfs, GTFS):
+        gtfs = GTFS.from_zip(gtfs)
 
     files = gtfs.files
 
@@ -364,7 +372,7 @@ def filter_gtfs_per_mode(gtfs: GTFS, route_type: int, output_path: str = None) -
 
     return filtered_gtfs
 
-def filter_gtfs_per_bbox(gtfs: GTFS, bbox: tuple[float, float, float, float], output_path: str = None):
+def filter_gtfs_per_bbox(gtfs: "GTFS | str | Path", bbox: tuple[float, float, float, float], output_path: str = None):
     """
     Allows to filter all the services present in a GTFS feed in a specific geographical area.
 
@@ -380,6 +388,8 @@ def filter_gtfs_per_bbox(gtfs: GTFS, bbox: tuple[float, float, float, float], ou
         - filtered_gtfs (GTFS): GTFS feed filtered to a specific bounding box. Export it if output_path is specified.
 
     """
+    if not isinstance(gtfs, GTFS):
+        gtfs = GTFS.from_zip(gtfs)
 
     files = gtfs.files
     min_lon, min_lat, max_lon, max_lat = bbox
@@ -470,14 +480,15 @@ def filter_gtfs_per_bbox(gtfs: GTFS, bbox: tuple[float, float, float, float], ou
 
 
 def prefix_stop_ids(
-    gtfs: "GTFS",
+    gtfs: "GTFS | str | Path",
     prefix: str,
+    output_path: str | Path | None = None,
 ) -> "GTFS":
     """
-    Some GTFS feed have the same structure for stop_ids. This function renames the stop_ids
-    of a feed with a specified prefix to avoid collisions while merging feeds.
-    
-    All the references in the GTFS feed (stops.txt, stop_times.txt and transfers.txt) are updated.
+    Prefix all stop IDs in a GTFS feed.
+
+    All references to stop IDs in stops.txt, stop_times.txt,
+    and transfers.txt are updated.
 
     Example:
         stop_id "123" -> "it:123"
@@ -485,13 +496,15 @@ def prefix_stop_ids(
     Returns:
         A new GTFS object.
     """
+    if not isinstance(gtfs, GTFS):
+        gtfs = GTFS.from_zip(gtfs)
+
+    files = gtfs.files
 
     prefix = str(prefix).rstrip(":") + ":"
 
-    stops = gtfs.files["stops.txt"].copy()
-    stop_times = gtfs.files["stop_times.txt"].copy()
+    stops = files.pop("stops.txt")
 
-    # Original -> prefixed ID
     stop_ids = stops["stop_id"].astype(str)
 
     stop_id_mapping = {
@@ -499,27 +512,32 @@ def prefix_stop_ids(
         for stop_id in stop_ids.unique()
     }
 
-    # stops.txt
-    stops["stop_id"] = stops["stop_id"].astype(str).replace(stop_id_mapping)
+    stops["stop_id"] = (
+        stops["stop_id"]
+        .astype(str)
+        .replace(stop_id_mapping)
+    )
 
     if "parent_station" in stops.columns:
-        stops["parent_station"] = stops["parent_station"].replace(stop_id_mapping)
+        stops["parent_station"] = (
+            stops["parent_station"]
+            .astype("string")
+            .replace(stop_id_mapping)
+        )
 
     # stop_times.txt
-    stop_times["stop_id"] = stop_times["stop_id"].astype(str).replace(stop_id_mapping)
+    stop_times = files.pop("stop_times.txt")
+
+    stop_times["stop_id"] = (
+        stop_times["stop_id"]
+        .astype(str)
+        .replace(stop_id_mapping)
+    )
 
     # transfers.txt
-    files = {
-        name: df.copy()
-        for name, df in gtfs.files.items()
-    }
+    transfers = files.pop("transfers.txt", None)
 
-    files["stops.txt"] = stops
-    files["stop_times.txt"] = stop_times
-
-    if "transfers.txt" in files:
-        transfers = files["transfers.txt"]
-
+    if transfers is not None:
         if "from_stop_id" in transfers.columns:
             transfers["from_stop_id"] = (
                 transfers["from_stop_id"]
@@ -534,9 +552,19 @@ def prefix_stop_ids(
                 .replace(stop_id_mapping)
             )
 
-    return GTFS(files)
+        files["transfers.txt"] = transfers
 
-def create_parent_stations(gtfs: "GTFS") -> "GTFS":
+    files["stops.txt"] = stops
+    files["stop_times.txt"] = stop_times
+
+    prefixed_gtfs = GTFS(files)
+
+    if output_path is not None:
+        prefixed_gtfs.export_gtfs(output_path)
+
+    return prefixed_gtfs
+
+def create_parent_stations(gtfs: "GTFS | str | Path", output_file: str = None) -> "GTFS":
     """
     Some feeds (e.g. spanish, italian) do not work with the parent and child hierarchy,
     and have only one level. As many functions in this package rely on this hierarchy,
@@ -551,8 +579,11 @@ def create_parent_stations(gtfs: "GTFS") -> "GTFS":
     Returns a new DataFrame containing the parent stations and
     the original child stops.
     """
+    if not isinstance(gtfs, GTFS):
+        gtfs = GTFS.from_zip(gtfs)
 
-    stops = gtfs.files.get("stops.txt")
+
+    stops = gtfs.files.pop("stops.txt")
 
     # Create parent stations from the existing stops
     parents = stops.copy()
@@ -569,9 +600,12 @@ def create_parent_stations(gtfs: "GTFS") -> "GTFS":
 
     gtfs.files["stops.txt"] = new_stops
 
+    if output_file is not None:
+        gtfs.export_gtfs(output_file)
+
     return gtfs
 
-def add_missing_parent_station(gtfs: "GTFS") -> "GTFS":
+def add_missing_parent_station(gtfs: "GTFS | str | Path", output_file: str = None) -> "GTFS":
     """
     Some feed (e.g. austrian )are missing parent stations for stops and only have the platforms.
     As many function in this package work on the parent level, parent stations are created
@@ -596,8 +630,10 @@ def add_missing_parent_station(gtfs: "GTFS") -> "GTFS":
     pd.DataFrame
         Updated stops DataFrame.
     """
+    if not isinstance(gtfs, GTFS):
+            gtfs = GTFS.from_zip(gtfs)
 
-    stops = gtfs.files["stops.txt"]
+    stops = gtfs.files.pop("stops.txt")
 
     # Rows that are candidates for a newly created parent station
     mask = stops["parent_station"].isna() & stops["location_type"].isna()
@@ -648,5 +684,8 @@ def add_missing_parent_station(gtfs: "GTFS") -> "GTFS":
     stops = pd.concat([stops, parents], ignore_index=True)
 
     gtfs.files["stops.txt"] = stops
+
+    if output_file is not None:
+        gtfs.export_gtfs(output_file)
 
     return gtfs
