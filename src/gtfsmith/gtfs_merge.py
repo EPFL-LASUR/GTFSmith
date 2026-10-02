@@ -789,10 +789,10 @@ def _merge_trip_data(
         matched_other_trip_ids = set(matches["second_trip_id"])
 
     # Find the unmatched trips and stop times
-    other_unmatched_trips = other_trips[~other_trips["trip_id"].isin(matched_other_trip_ids)]
+    other_unmatched_trips = other_trips[~other_trips["trip_id"].isin(matched_other_trip_ids)].copy()
     other_unmatched_stop_times = other_stop_times[
         ~other_stop_times["trip_id"].isin(matched_other_trip_ids)
-    ]
+    ].copy()
 
     # Replace the service IDs in the surviving trips
     if service_mapping:
@@ -1311,7 +1311,7 @@ def _merge_agency_data(
     matched_other_agency_ids = set(agency_matches["second_agency_id"])
 
     # Find unmatched agencies
-    other_unmatched_agencies = other_agencies[~other_agencies["agency_id"].isin(matched_other_agency_ids)]
+    other_unmatched_agencies = other_agencies[~other_agencies["agency_id"].isin(matched_other_agency_ids)].copy()
 
     self_agency_ids = set(self_agencies["agency_id"].astype(str))
 
