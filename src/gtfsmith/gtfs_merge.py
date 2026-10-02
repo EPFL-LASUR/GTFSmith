@@ -1288,8 +1288,7 @@ def _match_agencies(self: "GTFS", other: "GTFS", route_matches: pd.DataFrame) ->
 def _merge_agency_data(
     self: "GTFS",
     other: "GTFS",
-    self_routes: pd.DataFrame,
-    other_routes: pd.DataFrame,
+    merged_routes: pd.DataFrame,
     agency_matches: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
 
@@ -1342,11 +1341,15 @@ def _merge_agency_data(
         used_agency_ids.add(new_id)
 
 
-    # Apply mapping to other routes
-    other_routes["agency_id"] = other_routes["agency_id"].astype(str).replace(agency_mapping)
+    # Remap agency_id on the already-merged routes table, but only on the
+    # rows that came from `other`
+    other_route_ids = set(other.files["routes.txt"]["route_id"].astype(str))
+    is_other_route = merged_routes["route_id"].astype(str).isin(other_route_ids)
 
-    # Merge routes
-    merged_routes = pd.concat([self_routes, other_routes], ignore_index=True)
+    merged_routes = merged_routes.copy()
+    merged_routes.loc[is_other_route, "agency_id"] = (
+        merged_routes.loc[is_other_route, "agency_id"].astype(str).replace(agency_mapping)
+    )
 
     # Merge agencies
     merged_agency = pd.concat([self_agencies, other_unmatched_agencies], ignore_index=True)
@@ -1373,8 +1376,7 @@ def merge_agencies(self: "GTFS", other: "GTFS", merged_routes: pd.DataFrame, rou
     """
     agency_matches = _match_agencies(self, other, route_matches)
 
-    # merged_routes, merged_agency = self._merge_agency_data(other, merged_routes, agency_matches)
-    merged_routes, merged_agency = _merge_agency_data(self, other, self.files["routes.txt"], other.files["routes.txt"], agency_matches)
+    merged_routes, merged_agency = _merge_agency_data(self, other, merged_routes, agency_matches)
 
     if return_matches:
         return merged_routes, merged_agency, agency_matches
