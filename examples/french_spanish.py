@@ -2,9 +2,9 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from src.gtfsmith.gtfs_class import GTFS
-from src.gtfsmith.gtfs_merge import merge
-from src.gtfsmith.gtfs_operations import merge_duplicated_physical_stops, create_parent_stations, prefix_stop_ids
+from gtfsmith import GTFS
+from gtfsmith import merge
+from gtfsmith import merge_duplicated_physical_stops, create_parent_stations, prefix_stop_ids
 
 # Helper to download GTFS feeds
 def download_feed(url: str, destination: Path) -> None:
