@@ -1609,8 +1609,15 @@ def merge(
         return_matches=True,
     )
     print("Start to match parent mapping")
-    # Build the stop -> parent mapping for the original other feed.
+    # Build the stop -> parent mapping for the original other feed
+    # (needed for merge_transfers)
     child_to_parent_other = gtfs_utils._build_child_to_parent_mapping(other.files["stops.txt"])
+    # Map children from other to parent id of self (necessary to get the same
+    # hash signature across both feeds)
+    child_to_parent_other_for_matching = {
+        child_id: parent_mapping.get(parent_id, parent_id)
+        for child_id, parent_id in child_to_parent_other.items()
+    }
 
     print("Start to expand frequencies to trips and stop times")
     self = frequencies_to_trips(self)
@@ -1620,7 +1627,7 @@ def merge(
     trip_matches = _match_trips(
             self, other,
             first_child_to_parent=child_to_parent_self,
-            second_child_to_parent=child_to_parent_other,
+            second_child_to_parent=child_to_parent_other_for_matching,
             time_tolerance_sec=time_tolerance_sec,
         )
 
