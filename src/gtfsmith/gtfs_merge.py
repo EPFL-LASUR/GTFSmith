@@ -1556,7 +1556,7 @@ def merge_transfers(
             internal_propagated = (
                 pd.concat(internal_propagated_frames, ignore_index=True)
                 if internal_propagated_frames
-                else pd.DataFrame(columns=GTFS_Schema.transfer_columns)
+                else pd.DataFrame(columns=GTFS_Schema.transfers_columns)
             )
 
             helper_columns = ["_from_parent", "_to_parent", "_station_id", "_child_stop_id"]
@@ -1695,7 +1695,11 @@ def merge(
     if create_transfers:
         print("Start to create intermetropolitan transfers")
         new_transfers = create_intercity_transfers(merged_gtfs)
-        final_transfers = pd.concat([merged_transfers, new_transfers], ignore_index=True)
+        if merged_transfers is not None:
+            final_transfers = pd.concat([merged_transfers, new_transfers], ignore_index=True)
+        # only if the two feed have no transfers (i.e.merged_transfers returns None)
+        else:
+            final_transfers = new_transfers
         merged_gtfs.files["transfers.txt"] = final_transfers
 
     
