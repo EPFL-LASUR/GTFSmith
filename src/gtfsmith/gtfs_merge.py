@@ -34,18 +34,14 @@ def _match_parent_stations(
         self: "GTFS",
         other: "GTFS",
         distance_threshold_m: float = 250.0
-) -> pd.DataFrame:
+) -> dict[str, str]:
     """
     Match parent stations (location_type = 1) between two feeds.
+
     Returns:
-        first_stop_id
-        second_stop_id
-        first_stop_name
-        second_stop_nae
-        distance_m
-        name_similarity
-        score
-        
+        dict mapping second_stop_id -> first_stop_id for matched parent
+        stations (empty dict if either feed has no parent stations, or if
+        no matches were found).
     """
 
     # Get the parent stations
@@ -57,15 +53,7 @@ def _match_parent_stations(
     second_stops = gtfs_utils._prepare_coordinates(second_stops)
 
     if first_stops.empty or second_stops.empty:
-        return pd.DataFrame(columns=[
-            "first_stop_id",
-            "second_stop_id",
-            "first_stop_name",
-            "second_stop_name",
-            "distance_m",
-            "name_similarity",
-            "score"
-        ])
+        return {}
 
     # Convert coordinates to meters
     reference_lat = pd.concat([first_stops["stop_lat"], second_stops["stop_lat"]]).mean()
@@ -121,7 +109,7 @@ def _match_parent_stations(
     result = pd.DataFrame(matches)
 
     if result.empty:
-        return result
+        return {}
 
     # Keep only the strongest match for each first station
     result = result.sort_values("score", ascending=False).drop_duplicates(subset=["first_stop_id"], keep="first")
@@ -129,14 +117,10 @@ def _match_parent_stations(
     # Prevent one station from mapping to multiple first stations
     result = result.drop_duplicates(subset=["second_stop_id"], keep="first").sort_values("first_stop_id").reset_index(drop=True)
 
-    mapping = {}
-    
     if result.empty:
-        return mapping
-    
-    else:
-        mapping = dict(zip(result["second_stop_id"], result["first_stop_id"]))
-        return mapping
+        return {}
+
+    return dict(zip(result["second_stop_id"], result["first_stop_id"]))
 
 
 
@@ -161,7 +145,7 @@ def _match_child_stops(
         Mapping of second child stop IDs to first child stop IDs.
     """
 
-    if mapping_matched_parent.empty:
+    if not mapping_matched_parent:
         return {}
 
     first_stops = self.files["stops.txt"]
@@ -354,6 +338,8 @@ def _merge_stop_hierarchy(
                             Callers use this to remap stop_times.txt
                             and transfers.txt in `other`.
     """
+
+    child_mapping = child_mapping or {}
 
     first = self.files["stops.txt"].copy()
     second = other.files["stops.txt"].copy()
@@ -1428,7 +1414,7 @@ def merge_transfers(
     self_transfers = gtfs_utils._normalize_transfers(self_raw)
     other_transfers = gtfs_utils._normalize_transfers(other_raw)
 
-    
+    child_mapping = child_mapping or {}
     stop_id_mapping = {**parent_mapping, **child_mapping}
 
     trip_id_mapping = {}
