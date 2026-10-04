@@ -103,13 +103,13 @@ class GTFS_Schema(object):
 
     class Calendar(pa.DataFrameModel):
         service_id: Series[str] = pa.Field(coerce=True)
-        monday: Series[int] = pa.Field(isin=[0, 1])
-        tuesday: Series[int] = pa.Field(isin=[0, 1])
-        wednesday: Series[int] = pa.Field(isin=[0, 1])
-        thursday: Series[int] = pa.Field(isin=[0, 1])
-        friday: Series[int] = pa.Field(isin=[0, 1])
-        saturday: Series[int] = pa.Field(isin=[0, 1])
-        sunday: Series[int] = pa.Field(isin=[0, 1])
+        monday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
+        tuesday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
+        wednesday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
+        thursday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
+        friday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
+        saturday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
+        sunday: Series[int] = pa.Field(isin=[0, 1], coerce=True)
         start_date: Series[pd.Int64Dtype] = pa.Field(coerce=True)
         end_date: Series[pd.Int64Dtype] = pa.Field(coerce=True)
 
