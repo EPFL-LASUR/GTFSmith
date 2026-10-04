@@ -355,7 +355,7 @@ def _merge_stop_hierarchy(
     if "parent_station" in second.columns:
         second["parent_station"] = second["parent_station"].replace(parent_mapping)
 
-    merged = pd.concat([first, second], ignore_index=True, copy=False)
+    merged = pd.concat([first, second], ignore_index=True)
 
     duplicate_stop_ids = merged["stop_id"].duplicated(keep=False)
     if duplicate_stop_ids.any():
