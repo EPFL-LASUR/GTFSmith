@@ -43,7 +43,7 @@ class GTFS_Schema(object):
         route_short_name: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
         route_long_name: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
         route_desc: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
-        route_type: Series[int] = pa.Field(coerce=True, nullable=True)
+        route_type: Series[int] = pa.Field(coerce=True, isin=[0, 1, 2, 3, 4, 5, 6, 7, 11, 12])
         route_url: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
         route_color: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
         route_text_color: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
