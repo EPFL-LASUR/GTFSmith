@@ -126,6 +126,8 @@ def _prepare_coordinates(stops: pd.DataFrame) -> pd.DataFrame:
     """
     Convert stop_lat/stop_lon to numeric values and remove rows
     with missing coordinates.
+
+    CAREFUL: modifies the inputed DataFrame
     """
 
     stops["stop_lat"] = pd.to_numeric(stops["stop_lat"], errors="coerce")
@@ -154,24 +156,21 @@ def _latlon_to_xy(stops: pd.DataFrame, reference_lat: float) -> np.ndarray:
 def _build_child_to_parent_mapping(stops: pd.DataFrame) -> dict[str, str]:
     """
     Build a mapping from every stop_id to the station it belongs to.
-        For a parent station: 8500010 -> 8500010
-        For a platform: 8500010:0:18 -> 8500010
+
+    Stops with a parent_station map to that parent.
+    Stops without a parent_station map to themselves.
     """
 
     result = {}
 
     for _, row in stops.iterrows():
         stop_id = row["stop_id"]
-        location_type = pd.to_numeric(row.get("location_type"), errors="coerce")
-
-        if location_type == 1:
-            result[stop_id] = stop_id
-            continue
-
         parent_station = row.get("parent_station")
 
-        if pd.notna(parent_station) and str(parent_station) != "":
-            result[stop_id] = parent_station
+        if pd.notna(parent_station) and str(parent_station).strip() != "":
+            result[stop_id] = str(parent_station)
+        else:
+            result[stop_id] = stop_id
 
     return result
 
