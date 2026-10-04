@@ -372,7 +372,6 @@ def get_coordinates(place):
         print(f"Error with {place}: {e}")
     return None, None
 
-import pandas as pd
 
 
 
