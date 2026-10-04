@@ -56,7 +56,7 @@ def to_hhmmss(seconds: int) -> str:
 
 
 
-def _normalize_stop_name(name: "GTFS") -> str:
+def _normalize_stop_name(name: str) -> str:
     """
     Normalize a stop name before comparing it
     """
@@ -68,7 +68,13 @@ def _normalize_stop_name(name: "GTFS") -> str:
     name = unicodedata.normalize("NFKD", name)
     name = "".join(char for char in name if not unicodedata.combining(char))
 
+    # Normalize case
+    name = name.casefold()
+
     # Replace punctuation with spaces
+    name = re.sub(r"[^\w\s]", " ", name)
+
+    # Collapse whitespaces
     name = re.sub(r"\s+", " ", name).strip()
 
     return name
