@@ -691,14 +691,6 @@ class TestMergeServices:
         assert self_dates == {"SV1": WEEK}
         assert other_dates == {"SV2b": WEEKEND}
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="If an UNMATCHED service_id from `other` is identical to a service_id in `self` "
-               "(very common: both feeds use '1', 'WD', ...), other's dates silently overwrite "
-               "self's, and other's trips are never renamed. Self's trips then run on the wrong "
-               "days. A fix would rename the colliding other-ids (in trips too), as is done for "
-               "agency_ids.",
-    )
     def test_colliding_unmatched_service_ids_do_not_overwrite_self(self, gm):
         calendar, calendar_dates = gm.merge_services(
             self_dates={"SV1": WEEK},

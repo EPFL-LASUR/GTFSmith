@@ -2,10 +2,6 @@
 Tests for the ROUTES part of gtfs_merge:
     _match_routes, _merge_route_data, merge_routes
 plus end-to-end checks on routes through gm.merge().
-
-Tests marked `xfail` document suspected bugs in the current implementation
-(see the reason string on each). They are non-strict, so they won't break the
-run, and they will report XPASS once the behaviour is fixed.
 """
 
 import pandas as pd
@@ -232,12 +228,6 @@ class TestMergeRouteData:
         pd.testing.assert_frame_equal(first_routes, snapshots[0])
         pd.testing.assert_frame_equal(second_routes, snapshots[1])
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="Unmatched routes from `other` that reuse a route_id already present in `self` "
-               "are concatenated as-is, producing duplicate route_ids (stops.txt and agency.txt "
-               "both guard against this; routes.txt does not).",
-    )
     def test_colliding_unmatched_route_ids_do_not_create_duplicates(self, gm):
         first = BareGTFS({"routes.txt": routes_df([("R1", "Self route")])})
         second = BareGTFS({"routes.txt": routes_df([("R1", "Totally different route")])})
@@ -301,12 +291,6 @@ class TestMergeRoutes:
 
         assert list(result["route_id"]) == ["R1", "R1b"]
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="Matched routes are removed from `other`, but trips of `other` that were NOT "
-               "matched keep their old route_id (merge_trips has no route mapping), so they "
-               "end up pointing at a route_id that no longer exists in routes.txt.",
-    )
     def test_unmatched_trip_on_a_matched_route_keeps_valid_route_reference(self, gm):
         stop_times_cols = ["trip_id", "stop_sequence", "stop_id"]
         first = BareGTFS({
