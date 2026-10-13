@@ -952,6 +952,33 @@ def merge_routes(self: "GTFS", other: "GTFS", trip_matches: pd.DataFrame, return
 ######## --------------------- SERVICES ----------------------- ############
 
 
+def _resolve_service_collisions(
+    self_dates: dict[str, set[str]],
+    other_dates: dict[str, set[str]],
+    service_mapping: dict,
+) -> dict:
+    """
+    Extend `service_mapping` (other -> self, matched services) with renames for
+    UNMATCHED other services whose id is already used by a self service.
+    """
+    mapping = dict(service_mapping)
+    mapped_keys = {str(k) for k in mapping}
+    self_ids = {str(k) for k in self_dates}
+    used = self_ids | {str(k) for k in other_dates} | {str(v) for v in mapping.values()}
+
+    for other_id in other_dates:
+        other_id = str(other_id)
+        if other_id in mapped_keys or other_id not in self_ids:
+            continue
+        base = f"other_{other_id}"
+        new_id, counter = base, 2
+        while new_id in used:
+            new_id = f"{base}_{counter}"
+            counter += 1
+        used.add(new_id)
+        mapping[other_id] = new_id
+    return mapping
+
 
 def _service_dates(self: "GTFS") -> dict[str, set[str]]:
     """
@@ -1177,23 +1204,21 @@ def merge_services(
     # If an other-service is matched to a self-service, the
     # self-service's dates are authoritative.
     # Otherwise, keep the other service and its dates.
+    self_ids_str = {str(k) for k in self_dates}
+
     for other_service_id, dates in other_dates.items():
-
-
-        final_service_id = service_mapping_str.get(
-            other_service_id,
-            other_service_id
-        )
+        other_service_id = str(other_service_id)
+        final_service_id = service_mapping_str.get(other_service_id, other_service_id)
 
         # If this service does not occur in the final trips, there is no need to create a calendar entry for it.
         if final_service_id not in merged_service_ids:
             continue
 
-        # Matched services are already represented by the authoritative self service.
-        if other_service_id in service_mapping_str:
+        # Matched (or colliding-and-unrenamed): self's dates are authoritative.
+        if final_service_id in self_ids_str or final_service_id in final_service_dates:
             continue
 
-        # Unmatched service from other survives with its original service_id and dates.
+        # Unmatched (possibly renamed) service from other keeps its own dates.
         final_service_dates[final_service_id] = set(dates)
 
     # Safety check
