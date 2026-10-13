@@ -219,20 +219,23 @@ def create_parent_stations(gtfs: "GTFS | str | Path", output_file: str = None) -
 
     return gtfs
 
-def add_missing_parent_station(gtfs: "GTFS | str | Path", output_file: str = None) -> "GTFS":
+def add_missing_parent_station(
+    gtfs: "GTFS | str | Path",
+    output_file: str = None,
+) -> "GTFS":
     """
     Some feed (e.g. austrian )are missing parent stations for stops and only have the platforms.
     As many function in this package work on the parent level, parent stations are created
     for stops where they are missing, i.e. where parent_station = NA and location_type = NA
 
     For each group:
-      - A new parent station is created.
-      - Its stop_id is derived from the child stop_ids.
-      - Its stop_name is taken from the child stops.
-      - Its latitude/longitude are the mean of the child coordinates.
-      - location_type is set to 1.
-      - Each child stop gets parent_station set to the new parent ID.
-      - Child location_type is set to 0.
+        - A new parent station is created.
+        - Its stop_id is derived from the child stop_ids.
+        - Its stop_name is taken from the child stops.
+        - Its latitude/longitude are the mean of the child coordinates.
+        - location_type is set to 1.
+        - Each child stop gets parent_station set to the new parent ID.
+        - Child location_type is set to 0.
 
     Parameters
     ----------
@@ -245,24 +248,33 @@ def add_missing_parent_station(gtfs: "GTFS | str | Path", output_file: str = Non
         Updated stops DataFrame.
     """
     if not isinstance(gtfs, GTFS):
-            gtfs = GTFS.from_zip(gtfs)
+        gtfs = GTFS.from_zip(gtfs)
+
+    if "stops.txt" not in gtfs.files:
+        raise ValueError("Missing required file: stops.txt")
 
     stops = gtfs.files.pop("stops.txt")
 
-    # Rows that are candidates for a newly created parent station
-    mask = stops["parent_station"].isna() & stops["location_type"].isna()
+    # Check whether the hierarchy columns exist.
+    if "parent_station" not in stops.columns:
+        stops["parent_station"] = pd.NA
 
-    children = stops.loc[mask]
+    if "location_type" not in stops.columns:
+        stops["location_type"] = pd.NA
+
+    # Rows that are candidates for a newly created parent station.
+    mask = stops["parent_station"].isna() & stops["location_type"].isna()
+    
+    children = stops.loc[mask].copy()
 
     if children.empty:
-        return stops
+        gtfs.files["stops.txt"] = stops
 
-    # For Austrian IDs such as:
-    # at:41:3351:0:1
-    # at:41:3351:0:4
-    #
-    # derive:
-    # at:41:3351
+        if output_file is not None:
+            gtfs.export_gtfs(output_file)
+        return gtfs
+
+    # Derive parent IDs from child IDs.
     children["parent_id"] = children["stop_id"].str.rsplit(":", n=2).str[0]
 
     # Create one parent for each group
