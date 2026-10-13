@@ -69,7 +69,7 @@ def effective_dates(gm, calendar, calendar_dates, service_id):
 
 class TestServiceDates:
 
-    def test_service_dates_combines_calendar_and_calendar_dates(gm):
+    def test_service_dates_combines_calendar_and_calendar_dates(self, gm):
         feed = BareGTFS({
             "calendar.txt": pd.DataFrame([
                 {"service_id": "SV1", "monday": 1, "tuesday": 1, "wednesday": 1, "thursday": 1,
@@ -87,7 +87,7 @@ class TestServiceDates:
         assert dates["SV1"] == {"20240101", "20240102", "20240104", "20240105", "20240106"}
 
 
-    def test_match_services_requires_identical_effective_dates(gm, feed_a, feed_b):
+    def test_match_services_requires_identical_effective_dates(self, gm, feed_a, feed_b):
         trip_matches = pd.DataFrame([{"first_trip_id": "T1", "second_trip_id": "T1b"}])
 
         service_matches, self_dates, other_dates = gm._match_services(feed_a, feed_b, trip_matches)
@@ -98,7 +98,7 @@ class TestServiceDates:
         assert row["other_service_id"] == "SV1b"
 
 
-    def test_match_services_rejects_differing_date_sets(gm):
+    def test_match_services_rejects_differing_date_sets(self, gm):
         self_feed = BareGTFS({
             "trips.txt": pd.DataFrame([{"trip_id": "TA", "route_id": "RA", "service_id": "SV1"}]),
             "calendar.txt": pd.DataFrame([
@@ -122,7 +122,7 @@ class TestServiceDates:
         assert service_matches.empty
 
 
-    def test_dates_to_calendar_round_trips_through_service_dates(gm):
+    def test_dates_to_calendar_round_trips_through_service_dates(self, gm):
         # An irregular pattern spanning two weeks, including a Saturday and a
         # skipped weekday -- the actual invariant that matters is that
         # calendar + calendar_dates together reproduce exactly this date set,
@@ -141,7 +141,7 @@ class TestServiceDates:
         assert reconstructed["SV1"] == dates
 
 
-    def test_merge_services_keeps_self_authoritative_for_matched_services(gm, feed_a, feed_b):
+    def test_merge_services_keeps_self_authoritative_for_matched_services(self, gm, feed_a, feed_b):
         trip_matches = pd.DataFrame([{"first_trip_id": "T1", "second_trip_id": "T1b"}])
         service_matches, self_dates, other_dates = gm._match_services(feed_a, feed_b, trip_matches)
         service_mapping = gm._service_mapping(feed_a, service_matches)
