@@ -23,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from gtfsmith import gtfs_preprocessing as ops          # <- adjust module name
+from gtfsmith import gtfs_preprocessing as ops
 from gtfsmith.gtfs_class import GTFS
 
 
