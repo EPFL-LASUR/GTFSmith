@@ -108,7 +108,7 @@ def prefix_stop_ids(
         stop_id "123" -> "it:123"
 
     Returns:
-        A new GTFS object.
+        The mutated GTFS object with new prefixes.
     """
     if not isinstance(gtfs, GTFS):
         gtfs = GTFS.from_zip(gtfs)
@@ -190,7 +190,7 @@ def create_parent_stations(gtfs: "GTFS | str | Path", output_file: str = None) -
       - Set the child's location_type to 0
       - Set the parent's location_type to 1
 
-    Returns a new DataFrame containing the parent stations and
+    Returns the GTFS feed expanded with the new parent stations and
     the original child stops.
     """
     if not isinstance(gtfs, GTFS):
@@ -244,8 +244,8 @@ def add_missing_parent_station(
 
     Returns
     -------
-    pd.DataFrame
-        Updated stops DataFrame.
+    "GTFS" object
+        Updated GTFS with the missing parent stations
     """
     if not isinstance(gtfs, GTFS):
         gtfs = GTFS.from_zip(gtfs)
