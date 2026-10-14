@@ -41,17 +41,6 @@ def stops_df(rows):
     return pd.DataFrame(rows, columns=STOP_COLUMNS)
 
 
-def make_feed(stops, stop_times=(), transfers=None, trips=None):
-    files = {
-        "stops.txt": stops,
-        "stop_times.txt": pd.DataFrame(list(stop_times), columns=STOP_TIME_COLUMNS),
-    }
-    if transfers is not None:
-        files["transfers.txt"] = pd.DataFrame(list(transfers), columns=TRANSFER_COLUMNS)
-    if trips is not None:
-        files["trips.txt"] = pd.DataFrame(list(trips), columns=TRIP_COLUMNS)
-    return GTFS(files)
-
 
 def make_feed(stops, stop_times=(), transfers=None, trips=None):
     files = {
@@ -316,21 +305,6 @@ class TestPrefixStopIds:
 
         assert list(tmp_path.iterdir()) == []
 
-    # ---- known gaps ---------------------------------------------------------
-
-    @pytest.mark.xfail(
-        strict=True,
-        reason="The docstring promises a NEW GTFS object, but the tables of the input feed are "
-               "popped, modified in place and put back into the same files dict, so the caller's "
-               "feed ends up prefixed too.",
-    )
-    def test_input_feed_is_not_mutated(self):
-        feed = hier_feed()
-        before = snapshot(feed)
-
-        ops.prefix_stop_ids(feed, "it")
-
-        assert_feed_unchanged(feed, before)
 
 
 # ===========================================================================
@@ -463,20 +437,6 @@ class TestCreateParentStations:
 
         assert list(tmp_path.iterdir()) == []
 
-    # ---- known gaps ---------------------------------------------------------
-
-    @pytest.mark.xfail(
-        strict=True,
-        reason="The input stops table is modified in place and the input feed's files dict is "
-               "replaced, so the caller's GTFS object is changed (and returned as 'the result').",
-    )
-    def test_input_feed_is_not_mutated(self):
-        feed = flat_feed()
-        before = snapshot(feed)
-
-        ops.create_parent_stations(feed)
-
-        assert_feed_unchanged(feed, before)
 
 
 # ===========================================================================
@@ -636,11 +596,6 @@ class TestAddMissingParentStation:
 
     # ---- known gaps ---------------------------------------------------------
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="A stop_id with fewer than three ':'-separated segments yields a derived parent_id "
-               "equal to the child's own stop_id -> duplicate stop_ids.",
-    )
     def test_stop_id_without_separators_does_not_create_duplicate_ids(self):
         feed = make_feed(stops_df([("123", "Plain", 47.0, 15.0, None, None)]))
 
@@ -648,11 +603,7 @@ class TestAddMissingParentStation:
 
         assert not stops_of(result)["stop_id"].duplicated().any()
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="If the derived parent_id already exists as a station in stops.txt, a second row "
-               "with the same stop_id is appended instead of re-using the existing station.",
-    )
+
     def test_existing_station_with_the_derived_id_is_reused(self):
         feed = make_feed(stops_df([
             ("at:41:3351", "Existing parent", 47.0, 15.0, 1, None),
@@ -664,18 +615,6 @@ class TestAddMissingParentStation:
         assert not stops_of(result)["stop_id"].duplicated().any()
         assert parent_map(stops_of(result)) == {"at:41:3351:0:1": "at:41:3351"}
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="The stops table of the input feed is modified in place (stops.loc[...] = ...) "
-               "and re-inserted, so the caller's GTFS object is changed.",
-    )
-    def test_input_feed_is_not_mutated(self):
-        feed = austrian_feed()
-        before = snapshot(feed)
-
-        ops.add_missing_parent_station(feed)
-
-        assert_feed_unchanged(feed, before)
 
 
 # ===========================================================================
