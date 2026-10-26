@@ -211,7 +211,7 @@ def prefix_stop_ids(
     return gtfs
 
 
-def create_parent_stations(gtfs: "GTFS | str | Path", output_file: str = None) -> "GTFS":
+def create_parent_stations(gtfs: "GTFS | str | Path", output_path: str = None) -> "GTFS":
     """
     Some feeds (e.g. spanish, italian) do not work with the parent and child hierarchy,
     and have only one level. As many functions in this package rely on this hierarchy,
@@ -243,15 +243,15 @@ def create_parent_stations(gtfs: "GTFS | str | Path", output_file: str = None) -
     # Combine parents and children
     gtfs.files["stops.txt"] = pd.concat([parents, stops], ignore_index=True)
 
-    if output_file is not None:
-        gtfs.export_gtfs(output_file)
+    if output_path is not None:
+        gtfs.export_gtfs(output_path)
 
     return gtfs
 
 
 def add_missing_parent_station(
     gtfs: "GTFS | str | Path",
-    output_file: str = None,
+    output_path: str = None,
 ) -> "GTFS":
     """
     Some feed (e.g. austrian) are missing parent stations for stops and only have the platforms.
@@ -296,8 +296,8 @@ def add_missing_parent_station(
     if children.empty:
         gtfs.files["stops.txt"] = stops
 
-        if output_file is not None:
-            gtfs.export_gtfs(output_file)
+        if output_path is not None:
+            gtfs.export_gtfs(output_path)
         return gtfs
 
     child_ids = children["stop_id"].astype(str)
@@ -355,15 +355,15 @@ def add_missing_parent_station(
 
     gtfs.files["stops.txt"] = stops
 
-    if output_file is not None:
-        gtfs.export_gtfs(output_file)
+    if output_path is not None:
+        gtfs.export_gtfs(output_path)
 
     return gtfs
 
 
 def normalize_swiss_routes(
     gtfs: "GTFS | str | Path",
-    output_file: str = None,
+    output_path: str = None,
 ) -> "GTFS":
     """
     Swiss GTFS feeds have a different classification of the routes types. To match the route types
@@ -379,7 +379,7 @@ def normalize_swiss_routes(
     routes["route_type"] = routes["route_type"].apply(gtfs_utils.normalize_route_type)
     gtfs.files["routes.txt"] = routes
 
-    if output_file is not None:
-        gtfs.export_gtfs(output_file)
+    if output_path is not None:
+        gtfs.export_gtfs(output_path)
 
     return gtfs
