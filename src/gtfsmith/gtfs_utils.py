@@ -11,6 +11,10 @@ from .gtfs_schema import GTFS_Schema
 
 
 
+
+######## ------------------ helpers for the merge ------------------ ########
+
+
 def convert_to_seconds(value):
     """Convert hhmmss to seconds"""
 
@@ -56,7 +60,7 @@ def to_hhmmss(seconds: int) -> str:
 
 
 
-def _normalize_stop_name(name: "GTFS") -> str:
+def _normalize_stop_name(name: str) -> str:
     """
     Normalize a stop name before comparing it
     """
@@ -68,7 +72,13 @@ def _normalize_stop_name(name: "GTFS") -> str:
     name = unicodedata.normalize("NFKD", name)
     name = "".join(char for char in name if not unicodedata.combining(char))
 
+    # Normalize case
+    name = name.casefold()
+
     # Replace punctuation with spaces
+    name = re.sub(r"[^\w\s]", " ", name)
+
+    # Collapse whitespaces
     name = re.sub(r"\s+", " ", name).strip()
 
     return name
@@ -120,6 +130,8 @@ def _prepare_coordinates(stops: pd.DataFrame) -> pd.DataFrame:
     """
     Convert stop_lat/stop_lon to numeric values and remove rows
     with missing coordinates.
+
+    CAREFUL: modifies the inputed DataFrame
     """
 
     stops["stop_lat"] = pd.to_numeric(stops["stop_lat"], errors="coerce")
@@ -148,24 +160,21 @@ def _latlon_to_xy(stops: pd.DataFrame, reference_lat: float) -> np.ndarray:
 def _build_child_to_parent_mapping(stops: pd.DataFrame) -> dict[str, str]:
     """
     Build a mapping from every stop_id to the station it belongs to.
-        For a parent station: 8500010 -> 8500010
-        For a platform: 8500010:0:18 -> 8500010
+
+    Stops with a parent_station map to that parent.
+    Stops without a parent_station map to themselves.
     """
 
     result = {}
 
     for _, row in stops.iterrows():
         stop_id = row["stop_id"]
-        location_type = pd.to_numeric(row.get("location_type"), errors="coerce")
-
-        if location_type == 1:
-            result[stop_id] = stop_id
-            continue
-
         parent_station = row.get("parent_station")
 
-        if pd.notna(parent_station) and str(parent_station) != "":
-            result[stop_id] = parent_station
+        if pd.notna(parent_station) and str(parent_station).strip() != "":
+            result[stop_id] = str(parent_station)
+        else:
+            result[stop_id] = stop_id
 
     return result
 
@@ -367,7 +376,6 @@ def get_coordinates(place):
         print(f"Error with {place}: {e}")
     return None, None
 
-import pandas as pd
 
 
 
@@ -399,3 +407,81 @@ def normalize_route_type(x):
     if x==202:
         return 3  # bus (202 is "intercity bus" but we don't have a better option)
     return x
+
+
+######## ------------------ helpers for the filters ------------------ ########
+
+
+def _read_table(files: dict, name: str, consume: bool):
+    """
+    Return files[name] (or None if absent).
+
+    The table is removed from the dict only when `consume` is True, i.e. when
+    the feed was loaded from a path inside this function and nobody else holds
+    it. This frees memory for big feeds (e.g. the Swiss one) without ever
+    destroying a GTFS object that belongs to the caller.
+    """
+    return files.pop(name, None) if consume else files.get(name)
+
+
+def _with_ancestors(stops: pd.DataFrame, stop_ids) -> set:
+    """
+    Return `stop_ids` plus every ancestor in the stop hierarchy
+    (boarding area -> platform -> station), so that no parent_station
+    reference is left dangling.
+    """
+    kept = {s for s in stop_ids if pd.notna(s)}
+
+    if "parent_station" not in stops.columns:
+        return kept
+
+    parent_of = stops.drop_duplicates("stop_id").set_index("stop_id")["parent_station"]
+    parent_of = parent_of[parent_of.notna() & (parent_of != "")]
+
+    frontier = set(kept)
+    while frontier:
+        parents = set(parent_of.reindex(list(frontier)).dropna()) - kept
+        kept |= parents
+        frontier = parents
+
+    return kept
+
+
+def _filter_transfers(transfers, stop_ids, trip_ids, route_ids):
+    """
+    Keep transfers whose references all survive the filtering.
+    Only the columns that exist are checked (all but the stop ids are optional in GTFS).
+    """
+    if transfers is None:
+        return None
+
+    mask = pd.Series(True, index=transfers.index)
+    for column, valid in (
+        ("from_stop_id", stop_ids),
+        ("to_stop_id", stop_ids),
+        ("from_trip_id", trip_ids),
+        ("to_trip_id", trip_ids),
+        ("from_route_id", route_ids),
+        ("to_route_id", route_ids),
+    ):
+        if column in transfers.columns:
+            mask &= valid_id(transfers[column], valid)
+
+    return transfers[mask]
+
+
+def _filter_services(table, service_ids):
+    if table is None:
+        return None
+    return table[table["service_id"].isin(service_ids)]
+
+
+def _build_filtered_gtfs(tables: dict, output_path) -> "GTFS":
+    """Create the GTFS object from the tables that exist (optional ones may be None)."""
+    files = {name: table for name, table in tables.items() if table is not None}
+    result = GTFS(files)
+
+    if output_path is not None:
+        result.export_gtfs(output_path)
+
+    return result

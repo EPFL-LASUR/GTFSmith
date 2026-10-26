@@ -189,3 +189,11 @@ Some providers (Renfe, Trenitalia) do not use the hierarchy of parent and childr
 This function is quite similar to the one [creating parent stations](#5-create-parent-stations). The difference however is that it is used on feed where the parent-children hierarchy exists, but is not fully implemented, i.e. some platforms have no reference to a parent station.
 
 Again, as [minotor](https://www.minotor.dev/) relies on this hierarchy, a parent station is needed. For stop IDs where the parent station field and the location type is NA, a parent station is therefore created. Its ID is built from the IDs of the children (*note*: this has been tailored on the austrian ÖBB GTFS feed, it may need to be adapted for other feeds requesting such operation), its coordinates is the mean of the platforms coordinates and its name is taken from the children names.
+
+## Tests
+
+To test the functionnality of the package, run:
+
+```bash
+uv run pytest
+```

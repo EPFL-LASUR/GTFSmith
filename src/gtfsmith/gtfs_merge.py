@@ -355,7 +355,7 @@ def _merge_stop_hierarchy(
     if "parent_station" in second.columns:
         second["parent_station"] = second["parent_station"].replace(parent_mapping)
 
-    merged = pd.concat([first, second], ignore_index=True, copy=False)
+    merged = pd.concat([first, second], ignore_index=True)
 
     duplicate_stop_ids = merged["stop_id"].duplicated(keep=False)
     if duplicate_stop_ids.any():
@@ -754,6 +754,7 @@ def _merge_trip_data(
         matches: pd.DataFrame,
         stop_id_mapping: dict[str, str] | None = None,
         service_mapping: dict | None = None,
+        route_mapping: dict | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Merge trips and stop_times from 'other' into 'self'. 'self' is authoritative for matched trips.
@@ -788,15 +789,33 @@ def _merge_trip_data(
         
         matched_other_trip_ids = set(matches["second_trip_id"])
 
+    # Routes: matched routes were removed from other's routes.txt and colliding
+    # ones renamed, so surviving trips must follow.
+    if (
+        route_mapping is None
+        and "routes.txt" in self.files
+        and "routes.txt" in other.files
+        and "route_id" in self_trips.columns
+        and "route_id" in other_trips.columns
+    ):
+        route_mapping = _route_mapping(self, other, _match_routes(self, other, matches))
+
     # Find the unmatched trips and stop times
     other_unmatched_trips = other_trips[~other_trips["trip_id"].isin(matched_other_trip_ids)].copy()
     other_unmatched_stop_times = other_stop_times[
         ~other_stop_times["trip_id"].isin(matched_other_trip_ids)
     ].copy()
 
-    # Replace the service IDs in the surviving trips
+    # map() (not replace()) so overlapping keys/values can never chain
     if service_mapping:
-        other_unmatched_trips["service_id"] = other_unmatched_trips["service_id"].replace(service_mapping)
+        other_unmatched_trips["service_id"] = other_unmatched_trips["service_id"].map(
+            lambda s: service_mapping.get(s, s)
+        )
+
+    if route_mapping and "route_id" in other_unmatched_trips.columns:
+        other_unmatched_trips["route_id"] = other_unmatched_trips["route_id"].map(
+            lambda r: route_mapping.get(r, r)
+        )
 
     # Replace the stop IDs in the surviving stop times
     if stop_id_mapping:
@@ -815,7 +834,8 @@ def merge_trips(self: "GTFS",
                 trip_matches,
                 stop_id_mapping: dict[str, str] | None = None,
                 service_mapping: dict | None = None,
-                return_matches: bool = False
+                return_matches: bool = False,
+                route_mapping: dict | None = None
     ):
     """
     Merge trips from another GTFS feed. The current object is authoritative.
@@ -825,7 +845,7 @@ def merge_trips(self: "GTFS",
     """
 
 
-    merged_trips, merged_stop_times = _merge_trip_data(self, other, trip_matches, stop_id_mapping=stop_id_mapping, service_mapping=service_mapping)
+    merged_trips, merged_stop_times = _merge_trip_data(self, other, trip_matches, stop_id_mapping=stop_id_mapping, service_mapping=service_mapping, route_mapping=route_mapping)
 
     if return_matches:
         return merged_trips, merged_stop_times, trip_matches
@@ -834,6 +854,40 @@ def merge_trips(self: "GTFS",
 
 
 ######## --------------------- ROUTES ----------------------- ############
+
+def _route_mapping(self: "GTFS", other: "GTFS", route_matches: pd.DataFrame) -> dict:
+    """
+    Return other_route_id -> final_route_id for EVERY route in `other`.
+      - matched routes map onto self's route_id
+      - unmatched routes whose id collides with a route_id in self are
+        renamed to 'other_<id>' (made unique)
+      - all other routes map to themselves
+    """
+    self_ids = self.files["routes.txt"]["route_id"]
+    other_ids = other.files["routes.txt"]["route_id"]
+
+    matched = {}
+    if route_matches is not None and not route_matches.empty:
+        matched = dict(zip(route_matches["second_route_id"], route_matches["first_route_id"]))
+
+    self_str = set(self_ids.astype(str))
+    used = self_str | set(other_ids.astype(str))
+
+    mapping = {}
+    for rid in other_ids:
+        if rid in matched:
+            mapping[rid] = matched[rid]
+        elif str(rid) not in self_str:
+            mapping[rid] = rid
+        else:
+            base = f"other_{rid}"
+            new_id, counter = base, 2
+            while new_id in used:
+                new_id = f"{base}_{counter}"
+                counter += 1
+            used.add(new_id)
+            mapping[rid] = new_id
+    return mapping
 
 
 
@@ -904,35 +958,37 @@ def _match_routes(self: "GTFS", other: "GTFS", trip_matches: pd.DataFrame) -> pd
 def _merge_route_data(self: "GTFS", other: "GTFS", route_matches: pd.DataFrame) -> pd.DataFrame:
     """
     Merge routes from 'other' into 'self'. 'self' is authoritative for matched routes.
+    Unmatched routes of 'other' whose route_id collides with one in 'self' are renamed
+    (see _route_mapping); trips/transfers must be remapped with the same mapping.
     """
-
     self_routes = self.files["routes.txt"].copy()
     other_routes = other.files["routes.txt"].copy()
 
-    # No matches
     if route_matches.empty:
-        return pd.concat([self_routes, other_routes], ignore_index=True)
+        matched_other_route_ids = set()
+    else:
+        required_columns = {"first_route_id", "second_route_id"}
+        missing = required_columns - set(route_matches.columns)
+        if missing:
+            raise ValueError(f"routes_matches is missing columns: {sorted(missing)}")
 
-    required_columns = {"first_route_id", "second_route_id"}
-    missing = required_columns - set(route_matches.columns)
-    if missing:
-        raise ValueError(f"routes_matches is missing columns: {sorted(missing)}")
+        if route_matches["first_route_id"].duplicated().any():
+            raise ValueError("A route from self matches multiple routes from other.")
 
-    # Verify one-to-one mapping
-    if route_matches["first_route_id"].duplicated().any():
-        raise ValueError("A route from self matches multiple routes from other.")
+        if route_matches["second_route_id"].duplicated().any():
+            raise ValueError("A route from other matches multiple routes from self.")
 
-    if route_matches["second_route_id"].duplicated().any():
-        raise ValueError("A route from other matches multiple routes from self.")
+        matched_other_route_ids = set(route_matches["second_route_id"])
 
-    # Remove matched routes from other.routes.txt
-    matched_other_route_ids = set(route_matches["second_route_id"])
+    route_mapping = _route_mapping(self, other, route_matches)
+
     other_unmatched_routes = other_routes[~other_routes["route_id"].isin(matched_other_route_ids)].copy()
+    other_unmatched_routes["route_id"] = other_unmatched_routes["route_id"].map(
+        lambda r: route_mapping.get(r, r)
+    )
 
-    # Combine routes
-    merged_routes = pd.concat([self_routes, other_unmatched_routes], ignore_index=True)
+    return pd.concat([self_routes, other_unmatched_routes], ignore_index=True)
 
-    return merged_routes
 
 def merge_routes(self: "GTFS", other: "GTFS", trip_matches: pd.DataFrame, return_matches: bool = False):
     """
@@ -951,6 +1007,33 @@ def merge_routes(self: "GTFS", other: "GTFS", trip_matches: pd.DataFrame, return
 
 ######## --------------------- SERVICES ----------------------- ############
 
+
+def _resolve_service_collisions(
+    self_dates: dict[str, set[str]],
+    other_dates: dict[str, set[str]],
+    service_mapping: dict,
+) -> dict:
+    """
+    Extend `service_mapping` (other -> self, matched services) with renames for
+    UNMATCHED other services whose id is already used by a self service.
+    """
+    mapping = dict(service_mapping)
+    mapped_keys = {str(k) for k in mapping}
+    self_ids = {str(k) for k in self_dates}
+    used = self_ids | {str(k) for k in other_dates} | {str(v) for v in mapping.values()}
+
+    for other_id in other_dates:
+        other_id = str(other_id)
+        if other_id in mapped_keys or other_id not in self_ids:
+            continue
+        base = f"other_{other_id}"
+        new_id, counter = base, 2
+        while new_id in used:
+            new_id = f"{base}_{counter}"
+            counter += 1
+        used.add(new_id)
+        mapping[other_id] = new_id
+    return mapping
 
 
 def _service_dates(self: "GTFS") -> dict[str, set[str]]:
@@ -1177,23 +1260,21 @@ def merge_services(
     # If an other-service is matched to a self-service, the
     # self-service's dates are authoritative.
     # Otherwise, keep the other service and its dates.
+    self_ids_str = {str(k) for k in self_dates}
+
     for other_service_id, dates in other_dates.items():
-
-
-        final_service_id = service_mapping_str.get(
-            other_service_id,
-            other_service_id
-        )
+        other_service_id = str(other_service_id)
+        final_service_id = service_mapping_str.get(other_service_id, other_service_id)
 
         # If this service does not occur in the final trips, there is no need to create a calendar entry for it.
         if final_service_id not in merged_service_ids:
             continue
 
-        # Matched services are already represented by the authoritative self service.
-        if other_service_id in service_mapping_str:
+        # Matched (or colliding-and-unrenamed): self's dates are authoritative.
+        if final_service_id in self_ids_str or final_service_id in final_service_dates:
             continue
 
-        # Unmatched service from other survives with its original service_id and dates.
+        # Unmatched (possibly renamed) service from other keeps its own dates.
         final_service_dates[final_service_id] = set(dates)
 
     # Safety check
@@ -1290,6 +1371,7 @@ def _merge_agency_data(
     other: "GTFS",
     merged_routes: pd.DataFrame,
     agency_matches: pd.DataFrame,
+    other_route_final_ids: set[str] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     self_agencies = self.files["agency.txt"]
@@ -1341,10 +1423,9 @@ def _merge_agency_data(
         used_agency_ids.add(new_id)
 
 
-    # Remap agency_id on the already-merged routes table, but only on the
-    # rows that came from `other`
-    other_route_ids = set(other.files["routes.txt"]["route_id"].astype(str))
-    is_other_route = merged_routes["route_id"].astype(str).isin(other_route_ids)
+    if other_route_final_ids is None:   # legacy behaviour
+        other_route_final_ids = set(other.files["routes.txt"]["route_id"].astype(str))
+    is_other_route = merged_routes["route_id"].astype(str).isin(other_route_final_ids)
 
     merged_routes = merged_routes.copy()
     merged_routes.loc[is_other_route, "agency_id"] = (
@@ -1376,12 +1457,21 @@ def merge_agencies(self: "GTFS", other: "GTFS", merged_routes: pd.DataFrame, rou
     """
     agency_matches = _match_agencies(self, other, route_matches)
 
+    matched_other = set() if route_matches.empty else set(route_matches["second_route_id"])
+    route_mapping = _route_mapping(self, other, route_matches)
+    other_final_ids = {str(v) for k, v in route_mapping.items() if k not in matched_other}
+
+    merged_routes, merged_agency = _merge_agency_data(
+        self, other, merged_routes, agency_matches,
+        other_route_final_ids=other_final_ids,
+    )
+
     merged_routes, merged_agency = _merge_agency_data(self, other, merged_routes, agency_matches)
 
     if return_matches:
         return merged_routes, merged_agency, agency_matches
 
-    return merged_routes, merged_agency 
+    return merged_routes, merged_agency
 
 
 ######## --------------------- TRANSFERS ----------------------- ############
@@ -1395,6 +1485,7 @@ def merge_transfers(
     child_mapping: dict[str, str] | None = None,
     trip_matches: pd.DataFrame | None = None,
     return_matches: bool = False,
+    route_mapping: dict | None = None,
 ):
     """
     child_matches: matches from merge_stops(..., return_matches=True) for
@@ -1431,6 +1522,10 @@ def merge_transfers(
     if trip_id_mapping:
         other_transfers["from_trip_id"] = other_transfers["from_trip_id"].replace(trip_id_mapping)
         other_transfers["to_trip_id"] = other_transfers["to_trip_id"].replace(trip_id_mapping)
+
+    if route_mapping:
+        other_transfers["from_route_id"] = other_transfers["from_route_id"].map(lambda r: route_mapping.get(r, r))
+        other_transfers["to_route_id"] = other_transfers["to_route_id"].map(lambda r: route_mapping.get(r, r))
 
     # Split generic (station-level) vs trip-specific rows 
     is_trip_specific = self_transfers["transfer_type"].isin({"4", "5"})
@@ -1638,6 +1733,11 @@ def merge(
     service_matches, self_dates, other_dates = _match_services(self, other, trip_matches)
     service_mapping = _service_mapping(self, service_matches)
 
+    service_mapping = _resolve_service_collisions(self_dates, other_dates, service_mapping)
+
+    route_matches_pre = _match_routes(self, other, trip_matches)
+    route_mapping = _route_mapping(self, other, route_matches_pre)
+
 
     print("Start to merge trips")
     # Merge trips
@@ -1648,6 +1748,7 @@ def merge(
         stop_id_mapping=stop_id_mapping,
         service_mapping=service_mapping,
         return_matches=True,
+        route_mapping=route_mapping
     )
 
 
@@ -1694,6 +1795,7 @@ def merge(
         other_child_to_parent=child_to_parent_other,
         child_mapping=child_mapping,
         trip_matches=trip_matches,
+        route_mapping=route_mapping
     )
 
     if merged_transfers is not None:
