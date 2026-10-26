@@ -48,6 +48,7 @@ def _remap_stop_references(gtfs: GTFS, mapping: dict) -> None:
 def merge_duplicated_physical_stops(
     gtfs: "GTFS | str | Path",
     radius_m: float = 300.0,
+    output_path: str | Path | None = None,
 ):
     """
     Some feed (i.e. french feed) have different stop_ids and stop_names for physical same stations.
@@ -98,12 +99,18 @@ def merge_duplicated_physical_stops(
     nearby_parents = gtfs_utils._find_nearby_parent_stations(stops, radius_m=radius_m)
 
     if nearby_parents.empty:
+        if output_path is not None:
+            gtfs.export_gtfs(output_path)
+
         return gtfs
 
     # losing parent -> winning parent
     parent_mapping = gtfs_utils._build_parent_merge_mapping(stops, nearby_parents)
 
     if not parent_mapping:
+        if output_path is not None:
+            gtfs.export_gtfs(output_path)
+        
         return gtfs
 
     # Re-parent children and remap every reference to a losing parent.
@@ -130,6 +137,9 @@ def merge_duplicated_physical_stops(
         raise ValueError(f"Duplicate stop_ids remain after merging duplicated physical stops: {duplicates[:20]}")
 
     gtfs.files["stops.txt"] = stops.reset_index(drop=True)
+
+    if output_path is not None:
+        gtfs.export_gtfs(output_path)
 
     return gtfs
 
