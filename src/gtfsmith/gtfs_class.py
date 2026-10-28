@@ -11,6 +11,20 @@ class GTFS:
     def __init__(self, files: dict[str, pd.DataFrame]):
         self.files = self._validate_files(files)
 
+    @classmethod
+    def _warn_extended_route_types(cls, routes: pd.DataFrame) -> None:
+        """Warn when routes use extended GTFS route types."""
+        extended = sorted(
+            set(routes["route_type"].dropna().unique())
+            & cls.EXTENDED_ROUTE_TYPES
+        )
+
+        if extended:
+            warnings.warn(f"This GTFS feed uses extended route types: f{extended}. These values are defined in Google's "
+                "extended GTFS route types reference and are accepted by this package.",
+                UserWarning, stacklevel=3,
+            )
+
 
     @classmethod
     def _validate_files(cls, files: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -32,14 +46,16 @@ class GTFS:
         if unexpected:
             warnings.warn(f"Unexpected files in GTFS feed: {sorted(unexpected)}", UserWarning, stacklevel=2)
 
-        feed_dict = {
-            file_name: (
-                GTFS_Schema.SCHEMAS[file_name].validate(df)
-                if file_name in expected
-                else df
-            )
-            for file_name, df in files.items()
-        }
+        feed_dict = {}
+
+        for file_name, df in files.items():
+            if file_name in expected:
+                df = GTFS_Schema.SCHEMAS[file_name].validate(df)
+
+                if file_name == "routes.txt":
+                    cls._warn_extended_route_types(df)
+
+            feed_dict[file_name] = df
 
         return feed_dict
     
