@@ -3,7 +3,7 @@ import zipfile
 from pathlib import Path
 import warnings
 
-from .gtfs_schema import GTFS_Schema
+from .gtfs_schema import GTFS_Schema, EXTENDED_ROUTE_TYPES
 
 class GTFS:
 
@@ -14,14 +14,14 @@ class GTFS:
     @classmethod
     def _warn_extended_route_types(cls, routes: pd.DataFrame) -> None:
         """Warn when routes use extended GTFS route types."""
-        extended = sorted(
-            set(routes["route_type"].dropna().unique())
-            & cls.EXTENDED_ROUTE_TYPES
-        )
+
+        extended = sorted(set(routes["route_type"].dropna().unique())& EXTENDED_ROUTE_TYPES)
 
         if extended:
-            warnings.warn(f"This GTFS feed uses extended route types: f{extended}. These values are defined in Google's "
-                "extended GTFS route types reference and are accepted by this package.",
+            warnings.warn(
+                f"This GTFS feed uses extended route types: {extended}. "
+                "These values are defined in Google's extended GTFS route "
+                "types reference and are accepted by this package.",
                 UserWarning, stacklevel=3,
             )
 

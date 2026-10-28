@@ -1,9 +1,36 @@
 from platform import platform
 from numpy import float64
 from pandera.typing import Series
-from typing import Optional, ClassVar
+from typing import Optional
 import pandera.pandas as pa
 import pandas as pd
+
+
+STANDARD_ROUTE_TYPES: set[int] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 11, 12
+}
+
+EXTENDED_ROUTE_TYPES: set[int] = {
+    100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+    110, 111, 112, 113, 114, 115, 116, 117,
+    200, 201, 202, 203, 204, 205, 206, 207, 208, 209,
+    400, 401, 402, 403, 404, 405,
+    700, 701, 702, 703, 704, 705, 706, 707, 708, 709,
+    710, 711, 712, 713, 714, 715, 716,
+    800,
+    900, 901, 902, 903, 904, 905, 906,
+    1000,
+    1100,
+    1200,
+    1300, 1301, 1302, 1303, 1304, 1305, 1306, 1307,
+    1400,
+    1500, 1501, 1502, 1503, 1504, 1505, 1506, 1507,
+    1700, 1702,
+}
+
+ACCEPTED_ROUTE_TYPES: set[int] = (
+    STANDARD_ROUTE_TYPES | EXTENDED_ROUTE_TYPES
+)
 
 
 class GTFS_Schema(object):
@@ -38,32 +65,6 @@ class GTFS_Schema(object):
         platform_code: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
 
     class Routes(pa.DataFrameModel):
-        STANDARD_ROUTE_TYPES: ClassVar[set[int]] = {
-            0, 1, 2, 3, 4, 5, 6, 7, 11, 12
-        }
-
-        EXTENDED_ROUTE_TYPES: ClassVar[set[int]] = {
-            100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-            110, 111, 112, 113, 114, 115, 116, 117,
-            200, 201, 202, 203, 204, 205, 206, 207, 208, 209,
-            400, 401, 402, 403, 404, 405,
-            700, 701, 702, 703, 704, 705, 706, 707, 708, 709,
-            710, 711, 712, 713, 714, 715, 716,
-            800,
-            900, 901, 902, 903, 904, 905, 906,
-            1000,
-            1100,
-            1200,
-            1300, 1301, 1302, 1303, 1304, 1305, 1306, 1307,
-            1400,
-            1500, 1501, 1502, 1503, 1504, 1505, 1506, 1507,
-            1700, 1702,
-        }
-
-        ACCEPTED_ROUTE_TYPES: ClassVar[set[int]] = (
-            STANDARD_ROUTE_TYPES | EXTENDED_ROUTE_TYPES
-        )
-
         route_id: Series[str] = pa.Field(coerce=True)
         agency_id: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
         route_short_name: Optional[Series[str]] = pa.Field(coerce=True, nullable=True)
