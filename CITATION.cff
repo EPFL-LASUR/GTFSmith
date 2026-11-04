@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use GTFSmith in your research, please cite it as follows."
+
+title: "GTFSmith"
+version: "0.2.3"
+type: software
+date-released: "2026-11-04"
+
+authors:
+  - family-names: "Lepper"
+    given-names: "Alexander"
+    affiliation: "EPFL"
+    ORCID: "0009-0008-6643-5441"
+
+abstract: "Python package for preprocessing, merging and working on GTFS feeds."
+
+repository-code: "https://github.com/EPFL-ENAC/GTFSmith"
+
+license: "GPLv3.0"
+
+keywords:
+  - public transport
+  - transit
+  - routing
+  - preprocessing
+  - GTFS
+  - geospatial
+  - Python
