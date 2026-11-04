@@ -426,7 +426,7 @@ class TestCreateParentStations:
     def test_output_file_writes_the_feed(self, tmp_path, flat):
         out = tmp_path / "with_parents.zip"
 
-        ops.create_parent_stations(flat, output_file=str(out))
+        ops.create_parent_stations(flat, output_path=str(out))
 
         assert out.exists()
 
@@ -578,7 +578,7 @@ class TestAddMissingParentStation:
     def test_output_file_writes_the_feed(self, tmp_path):
         out = tmp_path / "with_parents.zip"
 
-        ops.add_missing_parent_station(austrian_feed(), output_file=str(out))
+        ops.add_missing_parent_station(austrian_feed(), output_path=str(out))
 
         assert out.exists()
 
