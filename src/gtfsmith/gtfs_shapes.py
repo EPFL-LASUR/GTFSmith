@@ -1,4 +1,5 @@
 import multiprocessing
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 
@@ -388,15 +389,23 @@ class GTFSShapeBuilder:
 
         ctx = multiprocessing.get_context("fork")
 
-        with ProcessPoolExecutor(
-            max_workers=self.workers,
-            mp_context=ctx,
-        ) as pool:
-            yield from pool.map(
-                self._solve,
-                [pattern for _, pattern in items],
-                chunksize=32,
+        # Python 3.13 warns when forking a process that has threads.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"This process .* is multi-threaded, use of fork\(\) may lead to deadlocks in the child\.",
+                category=DeprecationWarning,
+                module=r"multiprocessing\.popen_fork",
             )
+            with ProcessPoolExecutor(
+                max_workers=self.workers,
+                mp_context=ctx,
+            ) as pool:
+                yield from pool.map(
+                    self._solve,
+                    [pattern for _, pattern in items],
+                    chunksize=32,
+                )
 
     def _solve_pattern(self, pattern: "_ShapePattern"):
         """
