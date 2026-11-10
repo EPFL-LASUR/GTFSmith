@@ -190,6 +190,41 @@ This function is quite similar to the one [creating parent stations](#5-create-p
 
 Again, as [minotor](https://www.minotor.dev/) relies on this hierarchy, a parent station is needed. For stop IDs where the parent station field and the location type is NA, a parent station is therefore created. Its ID is built from the IDs of the children (*note*: this has been tailored on the austrian ÖBB GTFS feed, it may need to be adapted for other feeds requesting such operation), its coordinates is the mean of the platforms coordinates and its name is taken from the children names.
 
+### 7. Generate missing GTFS shapes from OSM
+
+The `gtfs_shapes.py` file provides the `GTFSShapeBuilder` class, which allows missing geometries in a GTFS feed to be reconstructed using an OSM `TransitRouteNetwork`.
+
+In GTFS, the `shapes.txt` file describes the geographical path followed by a vehicle. However, this file is not always provided by agencies, or some trips may reference shape IDs that do not exist. This function addresses these cases by generating new shapes from the ordered stop sequences in `stop_times.txt`.
+
+The first step is to identify trips without a valid shape. These trips are then grouped according to their route and their complete ordered stop sequence. Trips sharing the same route and stop sequence are treated as one pattern and therefore only require one generated shape, reducing redundant computations.
+
+For each pattern, the builder retrieves the coordinates of all its stops and attempts to reconstruct the complete route geometry using `TransitRouteNetwork.get_geometry_for_stop_sequence()`. This matching uses the route reference and type when available, but can also rely on spatial proximity and the complete stop sequence. This allows the geometry to be reconstructed even when the GTFS route cannot be matched directly to a single OSM route.
+
+The resulting geometries are converted into entries in `shapes.txt`. The `shape_dist_traveled` field is computed as the cumulative geographical distance between consecutive shape points. New shape IDs are generated using the corresponding GTFS route ID, with a numerical suffix added if necessary to avoid collisions with existing IDs. Finally, the generated shapes are merged into the feed and their IDs assigned to the corresponding trips in `trips.txt`.
+
+The process can be parallelised using multiple worker processes, which can substantially reduce computation time for large feeds. The number of workers is configurable through the `workers` parameter.
+
+Patterns for which no geometry can be generated are collected in `builder.report`, a pandas DataFrame. Detailed diagnostics can be enabled with the `diagnose` parameter, providing information about the OSM route candidates, matching progress and the reason for failure. Patterns that cannot be processed because of missing stop coordinates, too few stops or an unknown route type are also included in the report.
+
+The main parameters are:
+
+| Parameter | Default | Description |
+|---|:---:|---|
+| `max_stop_distance_m` | 750 m | Maximum distance allowed between a GTFS stop and the OSM route geometry. |
+| `workers` | 1 | Number of worker processes. `None` uses all available cores and requires the `fork` start method. |
+| `diagnose` | `True` | Whether to generate detailed diagnostics for unmatched patterns. |
+
+The operation is wrapped in the `GTFSShapeBuilder` class and can be called as follows:
+
+```python
+builder = GTFSShapeBuilder(gtfs, network, workers=4)
+
+gtfs = builder.build()
+
+# Inspect patterns for which no shape could be generated
+report = builder.report
+```
+
 ## Tests
 
 To test the functionnality of the package, run:
