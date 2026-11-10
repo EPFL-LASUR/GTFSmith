@@ -442,8 +442,10 @@ class GTFSShapeBuilder:
             return None, info
 
 
-    def _solve(self, pattern: "_ShapePattern"):
-        return self._solve_pattern(_BUILDER, pattern)
+    @staticmethod
+    def _solve(pattern: "_ShapePattern"):
+        """Worker entry point; each forked process inherits _BUILDER."""
+        return _BUILDER._solve_pattern(pattern)
 
 
     def _report_row(
