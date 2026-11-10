@@ -659,7 +659,7 @@ class GTFSShapeBuilder:
         frames.extend(new_shape_frames)
 
         if frames:
-            shapes = pd.concat(frames, ignore_index=True, copy=False)
+            shapes = pd.concat(frames, ignore_index=True)
 
             self.gtfs.update_file(
                 "shapes.txt",
