@@ -233,7 +233,7 @@ class GTFS_Schema(object):
             coerce=True,
             nullable=True
         )
-        field_value: Series[str] = pa.Field(coerce=True)
+        field_value: Optional[Series[str]] = pa.Field(coerce=True)
         language: Series[str] = pa.Field(coerce=True)
         translation: Series[str] = pa.Field(coerce=True)
 
