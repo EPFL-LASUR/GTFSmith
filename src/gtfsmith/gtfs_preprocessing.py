@@ -35,7 +35,7 @@ def _remap_stop_references(gtfs: GTFS, mapping: dict) -> None:
                 continue
             original = table[column]
             remapped = original.replace(mapping)
-            changed |= ~(remapped.eq(original) | (remapped.isna() & original.isna()))
+            changed |= original.isin(mapping.keys())
             table[column] = remapped
 
         if file_name == "transfers.txt" and {"from_stop_id", "to_stop_id"} <= set(table.columns):
