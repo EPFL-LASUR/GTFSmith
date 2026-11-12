@@ -32,4 +32,4 @@ dev = [
 ]
 
 [tool.uv.sources]
-transitforge = { git = "https://github.com/EPFL-LASUR/TransitForge", branch = "gtfs_shapes" }
+transitforge = { git = "https://github.com/EPFL-LASUR/TransitForge", rev = "v0.2.0" }

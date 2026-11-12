@@ -401,7 +401,7 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.14.5" },
     { name = "scipy", specifier = ">=1.18.1" },
     { name = "tqdm", specifier = ">=4.70.1" },
-    { name = "transitforge", git = "https://github.com/EPFL-LASUR/TransitForge?branch=gtfs_shapes" },
+    { name = "transitforge", git = "https://github.com/EPFL-LASUR/TransitForge?rev=v0.2.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1373,8 +1373,8 @@ wheels = [
 
 [[package]]
 name = "transitforge"
-version = "0.1.0"
-source = { git = "https://github.com/EPFL-LASUR/TransitForge?branch=gtfs_shapes#690aa2ebdc5172eb75adadf6d1a5ec9440e4e4d1" }
+version = "0.2.0"
+source = { git = "https://github.com/EPFL-LASUR/TransitForge?rev=v0.2.0#582bd36e750c7ced06a74f91c5534e6ac86d7f79" }
 dependencies = [
     { name = "dataclasses" },
     { name = "extractosm" },
