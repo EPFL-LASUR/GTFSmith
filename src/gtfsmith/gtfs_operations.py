@@ -2,8 +2,10 @@ import pandas as pd
 import geopandas as gpd
 import gc
 from pathlib import Path
+import warnings
 
 from .gtfs_class import GTFS
+from .gtfs_schema import STANDARD_ROUTE_TYPES
 from . import gtfs_utils
 
 def create_intercity_transfers(
@@ -202,6 +204,9 @@ def filter_gtfs_per_mode(gtfs: "GTFS | str | Path", route_type: int, output_path
     The input feed is never modified. If a path is given, the feed is loaded here and
     its tables are released as soon as they have been filtered, to save memory.
     """
+    if route_type not in STANDARD_ROUTE_TYPES:
+        warnings.warn(f"Route type {route_type} is not a standard GTFS route type.", UserWarning, stacklevel=2)
+
     consume = not isinstance(gtfs, GTFS)
     if consume:
         gtfs = GTFS.from_zip(gtfs)
