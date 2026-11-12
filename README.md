@@ -164,7 +164,7 @@ The search radius has been set to 300 m. Again, this is reasonable on the level 
 
 Some feeds (such as the swiss or the netherland's) are aggregated feeds at the national level, and contain therefore long-distance services, but also local and regional bus services. Connections by ship or cable can also be represented.
 
-As delightful it is to obtain this data open-source, it might not be useful for every purpose, and uses a lot of memory. GTFS objects can therefore be filtered according to a specific route type once loaded, reducing their size and drastically improving computation time.
+As delightful it is to obtain this data open-source, it might not be useful for every purpose, and uses a lot of memory. GTFS objects can therefore be filtered according to one or several specific route types once loaded, reducing their size and drastically improving computation time.
 
 All the references to the routes which are not corresponding to the specified route type are deleted from the GTFS object, reducing its size drastically (especially `stop_times.txt` can become substantially lighter). The memory is also cleaned using the garbage collector `gc.collect()`.
 
