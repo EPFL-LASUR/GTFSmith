@@ -16,6 +16,8 @@ from .gtfs_preprocessing import(
     normalize_swiss_routes
 )
 
+__version__ = "0.3.0"
+
 __all__ = ["GTFS", "GTFS_Schema", "GTFSShapeBuilder", "merge", "merge_multiple_gtfs", "create_intercity_transfers",
            "merge_duplicated_physical_stops", "filter_gtfs_per_mode", "filter_gtfs_per_bbox", "prefix_stop_ids", "create_parent_stations",
            "add_missing_parent_station", "normalize_swiss_routes"]

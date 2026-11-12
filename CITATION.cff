@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use GTFSmith in your research, please cite it as follows."
 
 title: "GTFSmith"
-version: "0.2.3"
+version: "0.3.0"
 type: software
 date-released: "2026-11-04"
 
