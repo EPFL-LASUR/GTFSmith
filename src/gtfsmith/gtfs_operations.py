@@ -2,8 +2,10 @@ import pandas as pd
 import geopandas as gpd
 import gc
 from pathlib import Path
+import warnings
 
 from .gtfs_class import GTFS
+from .gtfs_schema import STANDARD_ROUTE_TYPES
 from . import gtfs_utils
 
 def create_intercity_transfers(
@@ -191,17 +193,30 @@ def create_intercity_transfers(
 ######## ------------------ filters ------------------ ########
 
 
-def filter_gtfs_per_mode(gtfs: "GTFS | str | Path", route_type: int, output_path: str = None) -> GTFS:
+def filter_gtfs_per_mode(
+    gtfs: "GTFS | str | Path",
+    route_types: int | list[int] | set[int],
+    output_path: str = None,
+) -> GTFS:
     """
-    Not all the route_types are needed. This function allows to filter a GTFS feed
-    according to the desired route type. All unnecessary trips, stops, stop_times,
-    frequencies, transfers and dates are removed from the feed.
+    Filter a GTFS feed according to one or more route types.
 
-    This operation can make a big GTFS object (like the swiss GTFS) substantially lighter.
+    All unnecessary trips, stops, stop_times, frequencies, transfers
+    and dates are removed from the feed.
 
-    The input feed is never modified. If a path is given, the feed is loaded here and
-    its tables are released as soon as they have been filtered, to save memory.
+    The input feed is never modified. If a path is given, the feed is
+    loaded here and its tables are released as soon as they have been
+    filtered, to save memory.
     """
+    if isinstance(route_types, int):
+        route_types = {route_types}
+    else:
+        route_types = set(route_types)
+
+    non_standard = route_types - STANDARD_ROUTE_TYPES
+    if non_standard:
+        warnings.warn(f"Route type(s) {sorted(non_standard)} are not standard GTFS route types.", UserWarning, stacklevel=2)
+
     consume = not isinstance(gtfs, GTFS)
     if consume:
         gtfs = GTFS.from_zip(gtfs)
@@ -209,7 +224,7 @@ def filter_gtfs_per_mode(gtfs: "GTFS | str | Path", route_type: int, output_path
     files = gtfs.files
 
     routes = gtfs_utils._read_table(files, "routes.txt", consume)
-    filtered_routes = routes[routes["route_type"] == route_type]
+    filtered_routes = routes[routes["route_type"].isin(route_types)]
     route_ids = pd.Index(filtered_routes["route_id"].unique())
     del routes
 
@@ -223,8 +238,9 @@ def filter_gtfs_per_mode(gtfs: "GTFS | str | Path", route_type: int, output_path
     filtered_stop_times = stop_times[stop_times["trip_id"].isin(trip_ids)]
     served_stop_ids = filtered_stop_times["stop_id"].unique()
     del stop_times
+
     if consume:
-        gc.collect()  # release the big unfiltered stop_times before continuing
+        gc.collect()
 
     stops = gtfs_utils._read_table(files, "stops.txt", consume)
     stop_ids = pd.Index(list(gtfs_utils._with_ancestors(stops, served_stop_ids)))
@@ -236,10 +252,19 @@ def filter_gtfs_per_mode(gtfs: "GTFS | str | Path", route_type: int, output_path
         frequencies = frequencies[frequencies["trip_id"].isin(trip_ids)]
 
     transfers = gtfs_utils._filter_transfers(
-        gtfs_utils._read_table(files, "transfers.txt", consume), stop_ids, trip_ids, route_ids
+        gtfs_utils._read_table(files, "transfers.txt", consume),
+        stop_ids, trip_ids, route_ids
     )
-    calendar = gtfs_utils._filter_services(gtfs_utils._read_table(files, "calendar.txt", consume), service_ids)
-    calendar_dates = gtfs_utils._filter_services(gtfs_utils._read_table(files, "calendar_dates.txt", consume), service_ids)
+
+    calendar = gtfs_utils._filter_services(
+        gtfs_utils._read_table(files, "calendar.txt", consume),
+        service_ids,
+    )
+
+    calendar_dates = gtfs_utils._filter_services(
+        gtfs_utils._read_table(files, "calendar_dates.txt", consume),
+        service_ids,
+    )
 
     agency = gtfs_utils._read_table(files, "agency.txt", consume)
     if agency is not None:

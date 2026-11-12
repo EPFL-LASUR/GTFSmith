@@ -2,6 +2,7 @@ import pandas as pd
 import zipfile
 from pathlib import Path
 import warnings
+import io
 
 from .gtfs_schema import GTFS_Schema, EXTENDED_ROUTE_TYPES
 
@@ -97,15 +98,43 @@ class GTFS:
         files = cls._read_zip(path)
         return cls(files)
 
-    
     def export_gtfs(self, path: str | Path) -> None:
         """
-        Exports a GTFS object to a zip file
+        Exports a GTFS object to a ZIP file using streaming CSV output.
         """
 
         path = Path(path)
 
-        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(path, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=1, allowZip64=True) as zf:
 
             for file_name, df in self.files.items():
-                zf.writestr(file_name, df.to_csv(index=False))
+
+                print(f"Exporting {file_name}: {len(df):,} rows")
+
+                with zf.open(file_name, mode="w", force_zip64=True) as binary_file:
+
+                    # Wrap binary ZIP member in a text stream
+                    with io.TextIOWrapper(binary_file, encoding="utf-8", newline="") as text_file:
+                        df.to_csv(text_file, index=False, chunksize=50_000)
+
+        print(f"GTFS successfully exported to {path}")
+
+    def update_file(
+        self,
+        file_name: str,
+        df: pd.DataFrame,
+        validate: bool = True,
+    ) -> None:
+        """
+        Update a single GTFS file without revalidating the entire feed.
+        """
+
+        if file_name not in GTFS_Schema.SCHEMAS:
+            warnings.warn(f"Unexpected GTFS file: {file_name}", UserWarning, stacklevel=2)
+            self.files[file_name] = df
+            return
+
+        if validate:
+            df = GTFS_Schema.SCHEMAS[file_name].validate(df)
+
+        self.files[file_name] = df

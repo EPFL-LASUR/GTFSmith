@@ -164,7 +164,7 @@ The search radius has been set to 300 m. Again, this is reasonable on the level 
 
 Some feeds (such as the swiss or the netherland's) are aggregated feeds at the national level, and contain therefore long-distance services, but also local and regional bus services. Connections by ship or cable can also be represented.
 
-As delightful it is to obtain this data open-source, it might not be useful for every purpose, and uses a lot of memory. GTFS objects can therefore be filtered according to a specific route type once loaded, reducing their size and drastically improving computation time.
+As delightful it is to obtain this data open-source, it might not be useful for every purpose, and uses a lot of memory. GTFS objects can therefore be filtered according to one or several specific route types once loaded, reducing their size and drastically improving computation time.
 
 All the references to the routes which are not corresponding to the specified route type are deleted from the GTFS object, reducing its size drastically (especially `stop_times.txt` can become substantially lighter). The memory is also cleaned using the garbage collector `gc.collect()`.
 
@@ -189,6 +189,41 @@ Some providers (Renfe, Trenitalia) do not use the hierarchy of parent and childr
 This function is quite similar to the one [creating parent stations](#5-create-parent-stations). The difference however is that it is used on feed where the parent-children hierarchy exists, but is not fully implemented, i.e. some platforms have no reference to a parent station.
 
 Again, as [minotor](https://www.minotor.dev/) relies on this hierarchy, a parent station is needed. For stop IDs where the parent station field and the location type is NA, a parent station is therefore created. Its ID is built from the IDs of the children (*note*: this has been tailored on the austrian ÖBB GTFS feed, it may need to be adapted for other feeds requesting such operation), its coordinates is the mean of the platforms coordinates and its name is taken from the children names.
+
+### 7. Generate missing GTFS shapes from OSM
+
+The `gtfs_shapes.py` file provides the `GTFSShapeBuilder` class, which allows missing geometries in a GTFS feed to be reconstructed using an OSM `TransitRouteNetwork`.
+
+In GTFS, the `shapes.txt` file describes the geographical path followed by a vehicle. However, this file is not always provided by agencies, or some trips may reference shape IDs that do not exist. This function addresses these cases by generating new shapes from the ordered stop sequences in `stop_times.txt`.
+
+The first step is to identify trips without a valid shape. These trips are then grouped according to their route and their complete ordered stop sequence. Trips sharing the same route and stop sequence are treated as one pattern and therefore only require one generated shape, reducing redundant computations.
+
+For each pattern, the builder retrieves the coordinates of all its stops and attempts to reconstruct the complete route geometry using `TransitRouteNetwork.get_geometry_for_stop_sequence()`. This matching uses the route reference and type when available, but can also rely on spatial proximity and the complete stop sequence. This allows the geometry to be reconstructed even when the GTFS route cannot be matched directly to a single OSM route.
+
+The resulting geometries are converted into entries in `shapes.txt`. The `shape_dist_traveled` field is computed as the cumulative geographical distance between consecutive shape points. New shape IDs are generated using the corresponding GTFS route ID, with a numerical suffix added if necessary to avoid collisions with existing IDs. Finally, the generated shapes are merged into the feed and their IDs assigned to the corresponding trips in `trips.txt`.
+
+The process can be parallelised using multiple worker processes, which can substantially reduce computation time for large feeds. The number of workers is configurable through the `workers` parameter.
+
+Patterns for which no geometry can be generated are collected in `builder.report`, a pandas DataFrame. Detailed diagnostics can be enabled with the `diagnose` parameter, providing information about the OSM route candidates, matching progress and the reason for failure. Patterns that cannot be processed because of missing stop coordinates, too few stops or an unknown route type are also included in the report.
+
+The main parameters are:
+
+| Parameter | Default | Description |
+|---|:---:|---|
+| `max_stop_distance_m` | 750 m | Maximum distance allowed between a GTFS stop and the OSM route geometry. |
+| `workers` | 1 | Number of worker processes. `None` uses all available cores and requires the `fork` start method. |
+| `diagnose` | `True` | Whether to generate detailed diagnostics for unmatched patterns. |
+
+The operation is wrapped in the `GTFSShapeBuilder` class and can be called as follows:
+
+```python
+builder = GTFSShapeBuilder(gtfs, network, workers=4)
+
+gtfs = builder.build()
+
+# Inspect patterns for which no shape could be generated
+report = builder.report
+```
 
 ## Tests
 
